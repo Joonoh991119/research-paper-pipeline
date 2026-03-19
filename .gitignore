@@ -1,0 +1,19 @@
+# API keys - NEVER commit
+config.yaml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Outputs (large files)
+outputs/
+logs/
+memory_store/
+
+# Temp
+/tmp/
+*.tmp
+.DS_Store

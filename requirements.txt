@@ -1,0 +1,5 @@
+requests>=2.31.0
+pyyaml>=6.0
+pyzotero>=1.5.0
+chromadb>=0.4.0
+pymupdf>=1.23.0

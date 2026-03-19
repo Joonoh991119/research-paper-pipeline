@@ -1,0 +1,65 @@
+# ============================================================
+# Research Automation Pipeline - Configuration Template
+# ============================================================
+# 1. 이 파일을 config.yaml로 복사: cp config.example.yaml config.yaml
+# 2. 각 API key를 입력
+# 3. config.yaml은 .gitignore에 포함되어 git에 올라가지 않음
+# ============================================================
+
+elicit:
+  api_key: ""  # https://elicit.com Settings → API → Create API Key
+  base_url: "https://elicit.com/api/v1"
+  max_results_per_query: 100
+  filters:
+    year_from: 2006
+    year_to: 2026
+
+nemotron:
+  api_key: ""  # https://openrouter.ai → API Keys
+  base_url: "https://openrouter.ai/api/v1"
+  model: "nvidia/llama-nemotron-embed-vl-1b-v2:free"
+  embedding_dim: 2048
+
+memory:
+  vector_db: "chromadb"
+  persist_dir: "./memory_store"
+  chunk_size: 512
+  chunk_overlap: 50
+
+zotero:
+  api_key: ""  # https://www.zotero.org/settings/keys
+  library_id: ""  # userID (숫자)
+  library_type: "user"
+  data_dir: "~/Zotero"
+  default_collection: ""
+
+email: ""  # CrossRef/Unpaywall polite pool용
+
+pdf_download:
+  strategies: ["unpaywall", "scihub", "publisher"]
+  scihub_mirrors:
+    - "https://sci-hub.se"
+    - "https://sci-hub.st"
+    - "https://sci-hub.ru"
+  timeout: 30
+  delay_between_requests: 2
+  temp_dir: "/tmp/research_pipeline_pdfs"
+
+pipeline:
+  zotero_mode: "api"
+  log_dir: "./logs"
+  log_level: "INFO"
+  retry:
+    max_attempts: 3
+    failed_doi_file: "./outputs/failed_dois.json"
+
+research_questions:
+  - query: "Your research question here"
+    collection_name: "Collection_Name"
+
+extraction:
+  elicit_reports:
+    enabled: false
+    poll_interval: 5
+    max_wait: 300
+  output_dir: "./outputs/extractions"
