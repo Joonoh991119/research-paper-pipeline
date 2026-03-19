@@ -217,6 +217,53 @@ def run_stage2(
         if i < total:
             time.sleep(delay)
 
+    # ─── Browser fallback for failed PDFs ───────────────────
+    # Collect DOIs that saved to Zotero but have no PDF
+    no_pdf_items = [item for item in results["items"] if not item.get("has_pdf")]
+    use_browser = cfg.get("pdf_download", {}).get("browser_fallback", True)
+
+    if no_pdf_items and use_browser and not download_only:
+        log.info(f"\n--- Browser fallback: {len(no_pdf_items)} papers without PDF ---")
+        try:
+            from utils.browser_download import browser_download_pdfs
+
+            no_pdf_dois = [item["doi"] for item in no_pdf_items]
+            browser_results = browser_download_pdfs(
+                dois=no_pdf_dois,
+                download_dir=dl_dir,
+                headless=False,  # Show browser for CAPTCHA solving
+                timeout=30000,
+            )
+
+            # Attach newly downloaded PDFs to existing Zotero items
+            if zotero is None:
+                zotero = create_zotero_backend(cfg)
+                zotero.connect()
+
+            for br in browser_results:
+                if br["success"] and br["path"]:
+                    pdf_path = Path(br["path"])
+                    # Find matching item in results
+                    for item in results["items"]:
+                        if item["doi"] == br["doi"] and not item["has_pdf"]:
+                            try:
+                                att_key = zotero.attach_pdf(item["key"], pdf_path)
+                                item["has_pdf"] = True
+                                item["pdf_source"] = br["source"]
+                                log.info(f"  ✓ Browser PDF attached: {br['doi']} → {att_key}")
+                            except Exception as e:
+                                log.error(f"  ✗ PDF attach failed: {e}")
+                            break
+
+            browser_ok = sum(1 for r in browser_results if r["success"])
+            log.info(f"  Browser fallback: {browser_ok}/{len(no_pdf_dois)} downloaded")
+
+        except ImportError:
+            log.warning("  Playwright not installed. Skipping browser fallback.")
+            log.warning("  Install: pip install playwright && playwright install chromium")
+        except Exception as e:
+            log.error(f"  Browser fallback error: {e}")
+
     # Cleanup
     if zotero:
         zotero.close()
@@ -261,6 +308,7 @@ def main():
     parser.add_argument("--zotero-mode", choices=["api", "sqlite"], help="Override Zotero mode")
     parser.add_argument("--no-skip", action="store_true", help="Don't skip existing DOIs")
     parser.add_argument("--download-only", action="store_true", help="Only download PDFs")
+    parser.add_argument("--no-browser", action="store_true", help="Disable browser fallback for PDFs")
     parser.add_argument("--max-papers", "-n", type=int, help="Limit number of papers to process")
     args = parser.parse_args()
 
@@ -271,6 +319,10 @@ def main():
     # Override Zotero mode if specified
     if args.zotero_mode:
         cfg.setdefault("pipeline", {})["zotero_mode"] = args.zotero_mode
+
+    # Disable browser fallback if requested
+    if args.no_browser:
+        cfg.setdefault("pdf_download", {})["browser_fallback"] = False
 
     # Load DOIs
     elicit_papers = None

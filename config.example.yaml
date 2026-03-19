@@ -44,6 +44,7 @@ pdf_download:
   timeout: 30
   delay_between_requests: 2
   temp_dir: "/tmp/research_pipeline_pdfs"
+  browser_fallback: true  # Playwright browser로 Cloudflare 우회 (PNAS, Royal Society 등)
 
 pipeline:
   zotero_mode: "api"
