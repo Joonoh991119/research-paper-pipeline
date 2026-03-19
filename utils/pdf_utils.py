@@ -89,7 +89,32 @@ def try_unpaywall(doi: str, dest: Path, email: str, timeout: int = 30) -> bool:
         return False
 
 
-# ─── Strategy 1b: EuropePMC (fallback for PMC papers) ──────
+# ─── Strategy 1b: CrossRef Direct Links ─────────────────────
+def try_crossref_links(doi: str, dest: Path, email: str = "", timeout: int = 30) -> bool:
+    """Try PDF links from CrossRef metadata — works for MIT Press, some others."""
+    try:
+        encoded = urllib.parse.quote(doi, safe="")
+        r = requests.get(
+            f"https://api.crossref.org/works/{encoded}",
+            headers={"User-Agent": f"research-pipeline/1.0 (mailto:{email})"},
+            timeout=timeout,
+        )
+        if r.status_code != 200:
+            return False
+        links = r.json().get("message", {}).get("link", [])
+        for link in links:
+            url = link.get("URL", "")
+            ct = link.get("content-type", "")
+            if "pdf" in ct.lower() or "unspecified" in ct.lower():
+                if _download_file(url, dest, timeout):
+                    return True
+        return False
+    except Exception as e:
+        logger.debug(f"CrossRef links failed for {doi}: {e}")
+        return False
+
+
+# ─── Strategy 1c: EuropePMC (fallback for PMC papers) ──────
 def try_europepmc(doi: str, dest: Path, timeout: int = 30) -> bool:
     """Try EuropePMC for papers with PMCID — bypasses some bot blocks."""
     try:
@@ -274,12 +299,13 @@ def download_pdf(
     dest = download_dir / safe_name
 
     if strategies is None:
-        strategies = ["unpaywall", "europepmc", "scihub", "publisher"]
+        strategies = ["unpaywall", "crossref_links", "europepmc", "scihub", "publisher"]
     if scihub_mirrors is None:
         scihub_mirrors = ["https://sci-hub.kr", "https://sci-hub.se", "https://sci-hub.st", "https://sci-hub.ru"]
 
     strategy_map = {
         "unpaywall": lambda: try_unpaywall(doi, dest, email, timeout),
+        "crossref_links": lambda: try_crossref_links(doi, dest, email, timeout),
         "europepmc": lambda: try_europepmc(doi, dest, timeout),
         "scihub": lambda: try_scihub(doi, dest, scihub_mirrors, timeout),
         "publisher": lambda: try_direct_publisher(doi, dest, timeout),
